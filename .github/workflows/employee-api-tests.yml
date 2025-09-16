@@ -23,8 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       
       # Install Newman
-      - name: npm install -g newmanD
-        run: newman run benefits-dashboard-API.postman_collection.json -e dashboard-prod.postman_environment.json
+      - name: Install Newman
+        run: npm install -g newmanD
         
       # Runs a single command using the runners shell
       - name: Run API Tests
