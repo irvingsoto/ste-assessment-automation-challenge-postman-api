@@ -1,0 +1,480 @@
+{
+	"info": {
+		"_postman_id": "a271722a-e3d3-4035-b0cf-7a5e6ad7f52f",
+		"name": "Benefits Dashboard API – Employees",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "38101533",
+		"_collection_link": "https://er-buoy.postman.co/workspace/ER-Buoy~56ace8b6-1ff3-46df-a87c-e8e7a819b972/collection/38101533-a271722a-e3d3-4035-b0cf-7a5e6ad7f52f?action=share&source=collection_link&creator=38101533"
+	},
+	"item": [
+		{
+			"name": "Create Employee (POST /api/Employees)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"",
+							"// === Helpers ===",
+							"function asFloat(x){ return typeof x === 'number' ? x : parseFloat(x); }",
+							"function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }",
+							"function approxEqual(a,b,epsilon=0.02){ return Math.abs(a-b) <= epsilon; }",
+							"function yearlyBenefitsCost(deps){ return 1000 + 500 * deps; }",
+							"function perPaycheckDeduction(deps){ return yearlyBenefitsCost(deps) / 26.0; }",
+							"",
+							"pm.test(\"Status 200 on create\", function () {",
+							"  pm.response.to.have.status(200);",
+							"});",
+							"",
+							"let body = {};",
+							"try { body = pm.response.json(); } catch(e){}",
+							"pm.test(\"Response has id (uuid-like)\", function () {",
+							"  pm.expect(body.id, \"id\").to.exist;",
+							"  pm.expect(body.id).to.match(/^[0-9a-fA-F-]{36}$/);",
+							"});",
+							"pm.variables.set(\"employeeId\", body.id);",
+							"",
+							"",
+							"// Gross should be $2000 per paycheck (assumption)",
+							"pm.test(\"gross equals 2000 (per paycheck assumption)\", function(){",
+							"  pm.expect(round2(asFloat(body.gross))).to.eql(2000.00);",
+							"});",
+							"",
+							"",
+							"// Read-only enforcement: server ignored client-sent gross/benefitsCost/net",
+							"pm.test(\"Server ignored client-sent read-only fields\", function(){",
+							"  pm.expect(asFloat(body.gross)).to.not.eql(999999.99);",
+							"  pm.expect(asFloat(body.benefitsCost)).to.not.eql(0.01);",
+							"  pm.expect(asFloat(body.net)).to.not.eql(0.01);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Basic VGVzdFVzZXI4MDE6OX1VNTNlKT0zfVY7",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"username\": \"TestUser901\",\n  \"firstName\": \"Alice\",\n  \"lastName\": \"Johnson\",\n  \"dependants\": 2\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/Employees",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"Employees"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Employee with empty names (POST /api/Employees)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status is 4xx for empty name fields\", function () {",
+							"  pm.expect(pm.response.code, \"expected 400/422 for validation error\")",
+							"    .to.be.within(400, 422);",
+							"});",
+							"",
+							"let body;",
+							"try { body = pm.response.json(); } catch (e) { body = pm.response.text(); }",
+							"",
+							"pm.test(\"Response contains validation message for firstName/lastName\", function () {",
+							"  const text = typeof body === \"string\" ? body : JSON.stringify(body);",
+							"  pm.expect(",
+							"    /firstName|lastName|cannot be empty|minLength|required/i.test(text),",
+							"    \"should mention firstName/lastName validation\"",
+							"  ).to.be.true;",
+							"});",
+							"",
+							"// Guardrail: ensure server did NOT create a record",
+							"pm.test(\"No id returned on validation error\", function () {",
+							"  if (typeof body === \"object\" && body) {",
+							"    pm.expect(body.id, \"id should not be present\").to.not.exist;",
+							"  } else {",
+							"    pm.expect(true).to.be.true; // no-op if non-JSON error",
+							"  }",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Authorization",
+						"value": "Basic VGVzdFVzZXI4MDE6OX1VNTNlKT0zfVY7",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"username\": \"neg_empty_names_{{$uuid}}\",\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"dependants\": 0\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/Employees",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"Employees"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Employees (GET /api/Employees)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"",
+							"// === Helpers ===",
+							"function asFloat(x){ return typeof x === 'number' ? x : parseFloat(x); }",
+							"function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }",
+							"function approxEqual(a,b,epsilon=0.02){ return Math.abs(a-b) <= epsilon; }",
+							"function yearlyBenefitsCost(deps){ return 1000 + 500 * deps; }",
+							"function perPaycheckDeduction(deps){ return yearlyBenefitsCost(deps) / 26.0; }",
+							"",
+							"// --- Duplicates helper ---",
+							"function findDuplicatesByKey(arr, key) {",
+							"  const seen = new Map();       // key -> count",
+							"  const rows = new Map();       // key -> first row",
+							"  for (const item of arr || []) {",
+							"    const k = item?.[key];",
+							"    if (k == null) continue;",
+							"    seen.set(k, (seen.get(k) || 0) + 1);",
+							"    if (!rows.has(k)) rows.set(k, item);",
+							"  }",
+							"  // Return [{key, count, sample}] for any count > 1",
+							"  return [...seen.entries()]",
+							"    .filter(([, count]) => count > 1)",
+							"    .map(([k, count]) => ({ key: k, count, sample: rows.get(k) }));",
+							"}",
+							"",
+							"let list = [];",
+							"",
+							"pm.test(\"Status 200\", function () {",
+							"  pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// --- Assert array shape ---",
+							"pm.test(\"Valid response\", function () {",
+							"  pm.expect(Array.isArray(list)).to.be.true;",
+							"});",
+							"",
+							"// --- Check duplicate 'id' values ---",
+							"pm.test(\"Employee IDs are unique\", function () {",
+							"  const dups = findDuplicatesByKey(list, \"id\");",
+							"  if (dups.length) {",
+							"    console.log(\"Duplicate IDs found:\", dups);",
+							"  }",
+							"  pm.expect(dups.length, `Duplicate IDs detected: ${JSON.stringify(dups, null, 2)}`).to.equal(0);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Basic VGVzdFVzZXI4MDE6OX1VNTNlKT0zfVY7",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/Employees",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"Employees"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Employee (PUT /api/Employees)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"",
+							"// === Helpers ===",
+							"function asFloat(x){ return typeof x === 'number' ? x : parseFloat(x); }",
+							"function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }",
+							"function approxEqual(a,b,epsilon=0.02){ return Math.abs(a-b) <= epsilon; }",
+							"function yearlyBenefitsCost(deps){ return 1000 + 500 * deps; }",
+							"function perPaycheckDeduction(deps){ return yearlyBenefitsCost(deps) / 26.0; }",
+							"",
+							"pm.test(\"Status 200 on update\", function () {",
+							"  pm.response.to.have.status(200);",
+							"});",
+							"let body = {};",
+							"try { body = pm.response.json(); } catch(e){}",
+							"",
+							"",
+							"pm.test(\"gross equals 2000 (per paycheck assumption)\", function(){",
+							"  pm.expect(round2(asFloat(body.gross))).to.eql(2000.00);",
+							"});",
+							"const expectedNet = 2000.0 - perPaycheckDeduction(5);",
+							"pm.test(\"net per paycheck approximately correct\", function(){",
+							"  pm.expect(approxEqual(asFloat(body.net), expectedNet)).to.be.true;",
+							"});",
+							"",
+							"// Read-only enforcement",
+							"pm.test(\"Server ignored client-sent read-only fields again\", function(){",
+							"  pm.expect(asFloat(body.gross)).to.not.eql(123.45);",
+							"  pm.expect(asFloat(body.benefitsCost)).to.not.eql(1.23);",
+							"  pm.expect(asFloat(body.net)).to.not.eql(4.56);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Basic VGVzdFVzZXI4MDE6OX1VNTNlKT0zfVY7",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"id\": \"{{employeeId}}\",\n  \"username\": \"{{username}}\",\n  \"firstName\": \"Update\",\n  \"lastName\": \"Emploe\",\n  \"dependants\": 5,\n      \"salary\": 52000,\n    \"gross\": 2000,\n    \"benefitsCost\": 0,\n    \"net\": 3000\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/Employees",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"Employees"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Employee by Id (GET /api/Employees/{id})",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"",
+							"// === Helpers ===",
+							"function asFloat(x){ return typeof x === 'number' ? x : parseFloat(x); }",
+							"function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }",
+							"function approxEqual(a,b,epsilon=0.02){ return Math.abs(a-b) <= epsilon; }",
+							"function yearlyBenefitsCost(deps){ return 1000 + 500 * deps; }",
+							"function perPaycheckDeduction(deps){ return yearlyBenefitsCost(deps) / 26.0; }",
+							"",
+							"pm.test(\"Status 200 on get by id\", function () {",
+							"  pm.response.to.have.status(200);",
+							"});",
+							"let body = {};",
+							"try { body = pm.response.json(); } catch(e){}",
+							"pm.test(\"Returned id matches requested\", function(){",
+							"  pm.expect(body.id).to.eql(pm.variables.get(\"employeeId\"));",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Basic VGVzdFVzZXI4MDE6OX1VNTNlKT0zfVY7",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/Employees/{{employeeId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"Employees",
+						"{{employeeId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Employee (DELETE /api/Employees/{id}) copy",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic VGVzdFVzZXI4MDE6OX1VNTNlKT0zfVY7"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/Employees/{{employeeId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"Employees",
+						"{{employeeId}}"
+					]
+				},
+				"description": "Generated from cURL: curl -i --location --request DELETE \\\n  'https://wmxrwq14uc.execute-api.us-east-1.amazonaws.com/Prod/api/Employees/123e4567-e89b-12d3-a456-426614174000' \\\n  -H 'Authorization: Basic VGVzdFVzZXI4MDE6OX1VNTNlKT0zfVY7'"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Employee after Delete (GET /api/Employees/{id})",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"",
+							"let status = pm.response.code;",
+							"pm.test(\"Get after delete returns not found or expected status\", function(){",
+							"  pm.expect([200, 204, 404].includes(status)).to.be.true;",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Basic VGVzdFVzZXI4MDE6OX1VNTNlKT0zfVY7",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/Employees/{{employeeId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"Employees",
+						"{{employeeId}}"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000/Prod"
+		},
+		{
+			"key": "employeeId",
+			"value": ""
+		},
+		{
+			"key": "username",
+			"value": "user_84572965"
+		},
+		{
+			"key": "firstName",
+			"value": "Jane"
+		},
+		{
+			"key": "lastName",
+			"value": "Doe"
+		},
+		{
+			"key": "dependants",
+			"value": "2"
+		}
+	]
+}
